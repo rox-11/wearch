@@ -37,10 +37,11 @@ clear
 }
 
 show_help() {
-    echo -e "${CYAN}Usage: $0 [-u url] [-f file] [-w word] [-o outputfile]"
+    echo -e "${CYAN}Usage: $0 [-u url] [-f file] [-w word] [-l wordlist] [-o outputfile]"
     echo "  -u URL        : Specify a URL to search"
     echo "  -f FILE       : Specify a file containing URLs (one per line)"
-    echo "  -w WORD       : Specify the word to search for (case-insensitive)"
+    echo "  -w WORD       : Specify a single word to search (case-insensitive)"
+    echo "  -l WORDLIST   : Specify a file with words to search (one per line)"
     echo "  -o OUTPUTFILE : Save output to this file (optional)"
     echo "  -h            : Show this help message${NC}"
 }
@@ -57,11 +58,12 @@ __      _____  __ _ _ __ ___| |__
 TOTAL_MATCHES=0
 output=""
 
-while getopts ":u:f:w:o:h" o; do
+while getopts ":u:f:w:l:o:h" o; do
     case "${o}" in
         u) url="${OPTARG}" ;;
         f) file="${OPTARG}" ;;
         w) word="${OPTARG}" ;;
+        l) wordlist="${OPTARG}" ;;
         o) output="${OPTARG}" ;;
         h) show_help; exit 0 ;;
         *) show_help; exit 1 ;;
@@ -71,64 +73,92 @@ done
 output_print() {
     if [[ -n "$output" ]]; then
         # Strip ANSI color codes before writing to file
-        echo -e " $1" | sed 's/\x1b\[[0-9;]*m//g' >> "$output"
+        echo -e "$1" | sed 's/\x1b\[[0-9;]*m//g' >> "$output"
     else
         echo -e "$1"
     fi
 }
 
-if [[ -n "${url}" ]]; then
-    if [[ -z "${word}" ]]; then
-        echo -e "${RED}Please specify a word to search with -w${NC}"
-        exit 1
-    fi
-    echo -e "${YELLOW}Searching '${word}' in ${url}...${NC}"
-    result=$(curl -s "${url}")
+search_word_in_url() {
+    local url="$1"
+    local word="$2"
+
+    output_print "${YELLOW}Searching '${word}' in ${url}...${NC}"
+    result=$(curl -s "$url")
     if [[ $? -ne 0 ]]; then
-        echo -e "${RED}Failed to fetch ${url}${NC}"
-        exit 1
+        output_print "${RED}Failed to fetch ${url}${NC}"
+        return
     fi
+
     matches_plain=$(echo "$result" | grep -io "${word}")
     if [[ -n "$matches_plain" ]]; then
         count=$(echo "$matches_plain" | wc -l)
         TOTAL_MATCHES=$((TOTAL_MATCHES + count))
+        if [[ -n "$output" ]]; then
+            output_print "URL: ${url}"
+            output_print "Word: ${word}"
+        else
+            output_print "${CYAN}URL: ${url}${NC}"
+            output_print "${CYAN}Word: ${word}${NC}"
+        fi
         matches_colored=$(echo "$result" | grep -io --color=always "${word}" | sed "s/^/found: /")
         output_print "$matches_colored"
     else
-        output_print "${RED}No matches found.${NC}"
+        output_print "${RED}No matches found for '${word}'.${NC}"
     fi
+}
 
-elif [[ -n "${file}" ]]; then
-    if [[ -z "${word}" ]]; then
-        echo -e "${RED}Please specify a word to search with -w${NC}"
+# Validate input and perform searches
+if [[ -n "$url" ]]; then
+    if [[ -n "$wordlist" ]]; then
+        if [[ ! -f "$wordlist" || ! -r "$wordlist" ]]; then
+            echo -e "${RED}Wordlist file '${wordlist}' does not exist or is not readable.${NC}"
+            exit 1
+        fi
+        while read -r w; do
+            [[ -z "$w" ]] && continue
+            search_word_in_url "$url" "$w"
+        done < "$wordlist"
+
+    elif [[ -n "$word" ]]; then
+        search_word_in_url "$url" "$word"
+    else
+        echo -e "${RED}Please specify a word (-w) or a wordlist (-l) to search.${NC}"
         exit 1
     fi
-    if [[ ! -f "${file}" || ! -r "${file}" ]]; then
+
+elif [[ -n "$file" ]]; then
+    if [[ ! -f "$file" || ! -r "$file" ]]; then
         echo -e "${RED}File '${file}' does not exist or is not readable.${NC}"
         exit 1
     fi
-    while read -r line; do
-        [[ -z "$line" ]] && continue
-        output_print "${YELLOW}Searching '${word}' in URL: ${line}${NC}"
-        result=$(curl -s "${line}")
-        if [[ $? -ne 0 ]]; then
-            output_print "${RED}Failed to fetch ${line}${NC}"
-            continue
+    if [[ -n "$wordlist" ]]; then
+        if [[ ! -f "$wordlist" || ! -r "$wordlist" ]]; then
+            echo -e "${RED}Wordlist file '${wordlist}' does not exist or is not readable.${NC}"
+            exit 1
         fi
-        matches_plain=$(echo "$result" | grep -io "${word}")
-        if [[ -n "$matches_plain" ]]; then
-            count=$(echo "$matches_plain" | wc -l)
-            TOTAL_MATCHES=$((TOTAL_MATCHES + count))
-            matches_colored=$(echo "$result" | grep -io --color=always "${word}" | sed "s/^/found : /")
-            output_print "$matches_colored"
-        else
-            output_print "${RED}No matches found.${NC}"
-        fi
-        output_print "${GREEN}>>>>>>>  task done : -----------------------------------------------${NC}"
-    done < "${file}"
+        while read -r url_line; do
+            [[ -z "$url_line" ]] && continue
+            while read -r w; do
+                [[ -z "$w" ]] && continue
+                search_word_in_url "$url_line" "$w"
+            done < "$wordlist"
+            output_print "${GREEN}>>>>>>>  task done for ${url_line} : -----------------------------------------------${NC}"
+        done < "$file"
 
-else 
-    echo -e "${RED}Please specify either a URL (-u) or a file (-f) and a word (-w) to search${NC}"
+    elif [[ -n "$word" ]]; then
+        while read -r url_line; do
+            [[ -z "$url_line" ]] && continue
+            search_word_in_url "$url_line" "$word"
+            output_print "${GREEN}>>>>>>>  task done for ${url_line} : -----------------------------------------------${NC}"
+        done < "$file"
+    else
+        echo -e "${RED}Please specify a word (-w) or a wordlist (-l) to search.${NC}"
+        exit 1
+    fi
+
+else
+    echo -e "${RED}Please specify either a URL (-u) or a file (-f) and a word (-w) or wordlist (-l) to search${NC}"
     show_help
     exit 1
 fi
