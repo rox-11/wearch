@@ -37,11 +37,12 @@ clear
 }
 
 show_help() {
-    echo -e "${CYAN}Usage: $0 [-u url] [-f file] [-w word]"
-    echo "  -u URL   : Specify a URL to search"
-    echo "  -f FILE  : Specify a file containing URLs (one per line)"
-    echo "  -w WORD  : Specify the word to search for (case-insensitive)"
-    echo "  -h       : Show this help message${NC}"
+    echo -e "${CYAN}Usage: $0 [-u url] [-f file] [-w word] [-o outputfile]"
+    echo "  -u URL        : Specify a URL to search"
+    echo "  -f FILE       : Specify a file containing URLs (one per line)"
+    echo "  -w WORD       : Specify the word to search for (case-insensitive)"
+    echo "  -o OUTPUTFILE : Save output to this file (optional)"
+    echo "  -h            : Show this help message${NC}"
 }
 
 firstascii
@@ -54,16 +55,27 @@ __      _____  __ _ _ __ ___| |__
   			        v1.0.1 ${NC} "
 
 TOTAL_MATCHES=0
+output=""
 
-while getopts ":u:f:w:h" o; do
+while getopts ":u:f:w:o:h" o; do
     case "${o}" in
         u) url="${OPTARG}" ;;
         f) file="${OPTARG}" ;;
         w) word="${OPTARG}" ;;
+        o) output="${OPTARG}" ;;
         h) show_help; exit 0 ;;
         *) show_help; exit 1 ;;
     esac
 done
+
+output_print() {
+    if [[ -n "$output" ]]; then
+        # Strip ANSI color codes before writing to file
+        echo -e " $1" | sed 's/\x1b\[[0-9;]*m//g' >> "$output"
+    else
+        echo -e "$1"
+    fi
+}
 
 if [[ -n "${url}" ]]; then
     if [[ -z "${word}" ]]; then
@@ -76,13 +88,14 @@ if [[ -n "${url}" ]]; then
         echo -e "${RED}Failed to fetch ${url}${NC}"
         exit 1
     fi
-    matches=$(echo "$result" | grep -io --color=always "${word}")
-    if [[ -n "$matches" ]]; then
-        count=$(echo "$matches" | wc -l)
+    matches_plain=$(echo "$result" | grep -io "${word}")
+    if [[ -n "$matches_plain" ]]; then
+        count=$(echo "$matches_plain" | wc -l)
         TOTAL_MATCHES=$((TOTAL_MATCHES + count))
-        echo "$matches" | sed "s/^/found: /"
+        matches_colored=$(echo "$result" | grep -io --color=always "${word}" | sed "s/^/found: /")
+        output_print "$matches_colored"
     else
-        echo -e "${RED}No matches found.${NC}"
+        output_print "${RED}No matches found.${NC}"
     fi
 
 elif [[ -n "${file}" ]]; then
@@ -96,21 +109,22 @@ elif [[ -n "${file}" ]]; then
     fi
     while read -r line; do
         [[ -z "$line" ]] && continue
-        echo -e "${YELLOW}Searching '${word}' in URL: ${line}${NC}"
+        output_print "${YELLOW}Searching '${word}' in URL: ${line}${NC}"
         result=$(curl -s "${line}")
         if [[ $? -ne 0 ]]; then
-            echo -e "${RED}Failed to fetch ${line}${NC}"
+            output_print "${RED}Failed to fetch ${line}${NC}"
             continue
         fi
-        matches=$(echo "$result" | grep -io --color=always "${word}")
-        if [[ -n "$matches" ]]; then
-            count=$(echo "$matches" | wc -l)
+        matches_plain=$(echo "$result" | grep -io "${word}")
+        if [[ -n "$matches_plain" ]]; then
+            count=$(echo "$matches_plain" | wc -l)
             TOTAL_MATCHES=$((TOTAL_MATCHES + count))
-            echo "$matches" | sed "s/^/found: /"
+            matches_colored=$(echo "$result" | grep -io --color=always "${word}" | sed "s/^/found : /")
+            output_print "$matches_colored"
         else
-            echo -e "${RED}No matches found.${NC}"
+            output_print "${RED}No matches found.${NC}"
         fi
-        echo -e "${GREEN}>>>>>>>  task done : -----------------------------------------------${NC}"
+        output_print "${GREEN}>>>>>>>  task done : -----------------------------------------------${NC}"
     done < "${file}"
 
 else 
@@ -119,5 +133,5 @@ else
     exit 1
 fi
 
-echo -e "\n${GREEN}Total matches found: ${TOTAL_MATCHES}${NC}"
+output_print "\n${GREEN}Total matches found: ${TOTAL_MATCHES}${NC}"
 
