@@ -1,0 +1,48 @@
+Searching 'snom' in https://snomshell.netlify.app/...
+URL: https://snomshell.netlify.app/
+Word: snom
+found: [Ksnom[K
+found: [Ksnom[K
+found: [Ksnom[K
+found: [Ksnom[K
+found: [Ksnom[K
+>>>>>>>  task done for https://snomshell.netlify.app/ : -----------------------------------------------
+Searching 'snom' in https://snomshell.netlify.app/cmd...
+URL: https://snomshell.netlify.app/cmd
+Word: snom
+found: [Ksnom[K
+found: [Ksnom[K
+found: [Ksnom[K
+found: [Ksnom[K
+found: [Ksnom[K
+>>>>>>>  task done for https://snomshell.netlify.app/cmd : -----------------------------------------------
+
+Total matches found: 10
+Searching 'snm' in https://snomshell.netlify.app/...
+No matches found for 'snm'.
+>>>>>>>  task done for https://snomshell.netlify.app/ : -----------------------------------------------
+Searching 'snm' in https://snomshell.netlify.app/cmd...
+No matches found for 'snm'.
+>>>>>>>  task done for https://snomshell.netlify.app/cmd : -----------------------------------------------
+
+Total matches found: 0
+Searching 'sn' in https://snomshell.netlify.app/...
+URL: https://snomshell.netlify.app/
+Word: sn
+found: [Ksn[K
+found: [Ksn[K
+found: [Ksn[K
+found: [Ksn[K
+found: [Ksn[K
+>>>>>>>  task done for https://snomshell.netlify.app/ : -----------------------------------------------
+Searching 'sn' in https://snomshell.netlify.app/cmd...
+URL: https://snomshell.netlify.app/cmd
+Word: sn
+found: [Ksn[K
+found: [Ksn[K
+found: [Ksn[K
+found: [Ksn[K
+found: [Ksn[K
+>>>>>>>  task done for https://snomshell.netlify.app/cmd : -----------------------------------------------
+
+Total matches found: 10

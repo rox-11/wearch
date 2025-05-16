@@ -1,2 +1,0 @@
-https://snomshell.netlify.app/
-https://snomshell.netlify.app/cmd
