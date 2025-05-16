@@ -19,8 +19,15 @@ $ sudo pacman -S curl grep
 ## USAGE :
 
 ```bash
--u : url search 
--f : file content search
--w : search word 
-## $ ./wearch.sh -u https://exemple.com -w password
+
+-u URL        : Specify a URL to search"
+-f FILE       : Specify a file containing URLs (one per line)"
+-w WORD       : Specify a single word to search (case-insensitive)"
+-l WORDLIST   : Specify a file with words to search (one per line)"
+-o OUTPUTFILE : Save output to this file (optional)"
+-h            : Show this help message"
+
+$ ./wearch.sh -u https://exemple.com -w password -o output.txt
+$ ./wearch.sh -f endpoint.txt -l list.txt -o output.txt
+
 ```

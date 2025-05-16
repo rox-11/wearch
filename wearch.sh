@@ -10,7 +10,7 @@ source logo.sh
 firstascii
 
 show_help() {
-    echo -e "${CYAN}Usage: $0 [-u url] [-f file] [-w word] [-l wordlist] [-o outputfile]"
+    echo -e "${CYAN}Usage: $0 [-u url] OR [-f file] [-w word] OR [-l wordlist] [-o outputfile]"
     echo "  -u URL        : Specify a URL to search"
     echo "  -f FILE       : Specify a file containing URLs (one per line)"
     echo "  -w WORD       : Specify a single word to search (case-insensitive)"
