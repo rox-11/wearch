@@ -9,17 +9,8 @@ NC='\033[0m'
 source logo.sh
 firstascii
 
-show_help() {
-    echo -e "${CYAN}Usage: $0 [-u url] OR [-f file] [-w word] OR [-l wordlist] [-o outputfile]"
-    echo "  -u URL        : Specify a URL to search"
-    echo "  -f FILE       : Specify a file containing URLs (one per line)"
-    echo "  -w WORD       : Specify a single word to search (case-insensitive)"
-    echo "  -l WORDLIST   : Specify a file with words to search (one per line)"
-    echo "  -o OUTPUTFILE : Save output to this file (optional)"
-    echo "  -h            : Show this help message${NC}"
-}
+source help.sh
 
-firstascii
 echo -e " ${CYAN}                     
                              _     
 __      _____  __ _ _ __ ___| |__  
@@ -30,14 +21,16 @@ __      _____  __ _ _ __ ___| |__
 
 TOTAL_MATCHES=0
 output=""
+search_links=0
 
-while getopts ":u:f:w:l:o:h" o; do
+while getopts ":u:f:w:l:o:sh" o; do
     case "${o}" in
         u) url="${OPTARG}" ;;
         f) file="${OPTARG}" ;;
         w) word="${OPTARG}" ;;
         l) wordlist="${OPTARG}" ;;
         o) output="${OPTARG}" ;;
+        s) search_links=1 ;;
         h) show_help; exit 0 ;;
         *) show_help; exit 1 ;;
     esac
@@ -49,6 +42,26 @@ output_print() {
         echo -e "$1" | sed 's/\x1b\[[0-9;]*m//g' >> "$output"
     else
         echo -e "$1"
+    fi
+}
+
+extract_links_from_url() {
+    local url="$1"
+    output_print "${YELLOW}Extracting links from ${url}...${NC}"
+    content=$(curl -s "$url")
+    if [[ $? -ne 0 ]]; then
+        output_print "${RED}Failed to fetch ${url}${NC}"
+        return
+    fi
+    # Extract href links (basic, may miss some edge cases)
+    links=$(echo "$content" | grep -oP '(?i)href=["'\''][^"'\''#>]+["'\'']' | sed -E 's/href=["'\'']([^"'\''#>]+)["'\'']/\1/' | sort -u)
+    if [[ -n "$links" ]]; then
+        if [[ -n "$output" ]]; then
+            output_print "URL: ${url}"
+        fi
+        output_print "$links"
+    else
+        output_print "${RED}No links found in ${url}.${NC}"
     fi
 }
 
@@ -81,60 +94,79 @@ search_word_in_url() {
     fi
 }
 
-# Validate input and perform searches
-if [[ -n "$url" ]]; then
-    if [[ -n "$wordlist" ]]; then
-        if [[ ! -f "$wordlist" || ! -r "$wordlist" ]]; then
-            echo -e "${RED}Wordlist file '${wordlist}' does not exist or is not readable.${NC}"
-            exit 1
-        fi
-        while read -r w; do
-            [[ -z "$w" ]] && continue
-            search_word_in_url "$url" "$w"
-        done < "$wordlist"
-
-    elif [[ -n "$word" ]]; then
-        search_word_in_url "$url" "$word"
-    else
-        echo -e "${RED}Please specify a word (-w) or a wordlist (-l) to search.${NC}"
-        exit 1
-    fi
-
-elif [[ -n "$file" ]]; then
-    if [[ ! -f "$file" || ! -r "$file" ]]; then
-        echo -e "${RED}File '${file}' does not exist or is not readable.${NC}"
-        exit 1
-    fi
-    if [[ -n "$wordlist" ]]; then
-        if [[ ! -f "$wordlist" || ! -r "$wordlist" ]]; then
-            echo -e "${RED}Wordlist file '${wordlist}' does not exist or is not readable.${NC}"
+if [[ "$search_links" -eq 1 ]]; then
+    # Link extraction mode
+    if [[ -n "$url" ]]; then
+        extract_links_from_url "$url"
+    elif [[ -n "$file" ]]; then
+        if [[ ! -f "$file" || ! -r "$file" ]]; then
+            echo -e "${RED}File '${file}' does not exist or is not readable.${NC}"
             exit 1
         fi
         while read -r url_line; do
             [[ -z "$url_line" ]] && continue
+            extract_links_from_url "$url_line"
+            output_print "${GREEN}>>>>>>>  task done for ${url_line} : -----------------------------------------------${NC}"
+        done < "$file"
+    else
+        echo -e "${RED}Please specify a URL (-u) or a file (-f) when using -s to search links.${NC}"
+        exit 1
+    fi
+else
+    # Existing search logic for word or wordlist
+    if [[ -n "$url" ]]; then
+        if [[ -n "$wordlist" ]]; then
+            if [[ ! -f "$wordlist" || ! -r "$wordlist" ]]; then
+                echo -e "${RED}Wordlist file '${wordlist}' does not exist or is not readable.${NC}"
+                exit 1
+            fi
             while read -r w; do
                 [[ -z "$w" ]] && continue
-                search_word_in_url "$url_line" "$w"
+                search_word_in_url "$url" "$w"
             done < "$wordlist"
-            output_print "${GREEN}>>>>>>>  task done for ${url_line} : -----------------------------------------------${NC}"
-        done < "$file"
 
-    elif [[ -n "$word" ]]; then
-        while read -r url_line; do
-            [[ -z "$url_line" ]] && continue
-            search_word_in_url "$url_line" "$word"
-            output_print "${GREEN}>>>>>>>  task done for ${url_line} : -----------------------------------------------${NC}"
-        done < "$file"
-    else
-        echo -e "${RED}Please specify a word (-w) or a wordlist (-l) to search.${NC}"
+        elif [[ -n "$word" ]]; then
+            search_word_in_url "$url" "$word"
+        else
+            echo -e "${RED}Please specify a word (-w) or a wordlist (-l) to search.${NC}"
+            exit 1
+        fi
+
+    elif [[ -n "$file" ]]; then
+        if [[ ! -f "$file" || ! -r "$file" ]]; then
+            echo -e "${RED}File '${file}' does not exist or is not readable.${NC}"
+            exit 1
+        fi
+        if [[ -n "$wordlist" ]]; then
+            if [[ ! -f "$wordlist" || ! -r "$wordlist" ]]; then
+                echo -e "${RED}Wordlist file '${wordlist}' does not exist or is not readable.${NC}"
+                exit 1
+            fi
+            while read -r url_line; do
+                [[ -z "$url_line" ]] && continue
+                while read -r w; do
+                    [[ -z "$w" ]] && continue
+                    search_word_in_url "$url_line" "$w"
+                done < "$wordlist"
+                output_print "${GREEN}>>>>>>>  task done for ${url_line} : -----------------------------------------------${NC}"
+            done < "$file"
+
+        elif [[ -n "$word" ]]; then
+            while read -r url_line; do
+                [[ -z "$url_line" ]] && continue
+                search_word_in_url "$url_line" "$word"
+                output_print "${GREEN}>>>>>>>  task done for ${url_line} : -----------------------------------------------${NC}"
+            done < "$file"
+        else
+            echo -e "${RED}Please specify a word (-w) or a wordlist (-l) to search.${NC}"
+            exit 1
+        fi
+
+    else 
+        echo -e "${RED}Please specify either a URL (-u) or a file (-f) and a word (-w) or wordlist (-l) to search${NC}"
+        show_help
         exit 1
     fi
-
-else
-    echo -e "${RED}Please specify either a URL (-u) or a file (-f) and a word (-w) or wordlist (-l) to search${NC}"
-    show_help
-    exit 1
 fi
 
 output_print "\n${GREEN}Total matches found: ${TOTAL_MATCHES}${NC}"
-
